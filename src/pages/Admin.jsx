@@ -93,6 +93,52 @@ function AddPlayer() {
   )
 }
 
+function BulkAddPlayers() {
+  const [namesText, setNamesText] = useState('')
+  const [team, setTeam] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setMessage('')
+    const names = namesText.split(/[\n,]+/).map((n) => n.trim()).filter(Boolean)
+    if (names.length === 0) { setMessage('Paste at least one name.'); return }
+    setSaving(true)
+    for (const name of names) {
+      await addDoc(collection(db, 'players'), { name, team, position: '', createdAt: Date.now() })
+    }
+    setMessage(`Added ${names.length} players.`)
+    setNamesText('')
+    setSaving(false)
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <h3>Bulk add players 📋</h3>
+      <form className="form-grid" onSubmit={submit}>
+        <div>
+          <label>Names (one per line, or comma separated)</label>
+          <textarea
+            rows="6"
+            value={namesText}
+            onChange={(e) => setNamesText(e.target.value)}
+            placeholder={'Player One\nPlayer Two\nPlayer Three'}
+          />
+        </div>
+        <div>
+          <label>Team for all (optional)</label>
+          <input value={team} onChange={(e) => setTeam(e.target.value)} />
+        </div>
+        {message && <p className="error-text" style={{ color: 'var(--league)' }}>{message}</p>}
+        <button className="btn" type="submit" disabled={saving}>
+          {saving ? 'Adding…' : 'Add all players'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 function AddFixture({ players }) {
   const [tournamentName, setTournamentName] = useState('')
   const [format, setFormat] = useState(TOURNAMENT_TYPES[0])
@@ -317,7 +363,7 @@ function TournamentProgress({ players, matches }) {
     }).filter(Boolean)
 
     if (winners.length <= 1) {
-      alert(`🏆 Tournament complete! Champion: ${winners[0]?.name}. Record the result using "Record tournament result" above.`)
+      alert(`🏆 Tournament complete! Champion: ${winners[0]?.name}. Record the result using the recorder tools below.`)
       return
     }
 
@@ -617,6 +663,155 @@ function RecordTournamentResult({ players }) {
   )
 }
 
+function HistoricalGoalsRecorder({ players }) {
+  const [tournamentName, setTournamentName] = useState('')
+  const [tournamentType, setTournamentType] = useState(TOURNAMENT_TYPES[0])
+  const [date, setDate] = useState('')
+  const [winnerId, setWinnerId] = useState('')
+  const [winnerGoals, setWinnerGoals] = useState('')
+  const [runnerUpId, setRunnerUpId] = useState('')
+  const [runnerUpGoals, setRunnerUpGoals] = useState('')
+  const [scorerRows, setScorerRows] = useState(
+    Array.from({ length: 10 }, () => ({ playerId: '', goals: '' }))
+  )
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const updateRow = (index, field, value) => {
+    setScorerRows((rows) => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
+  }
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setMessage('')
+    if (!tournamentName.trim()) { setMessage('Enter a tournament name.'); return }
+    setSaving(true)
+
+    const byId = (id) => players.find((p) => p.id === id)
+    let savedCount = 0
+
+    if (winnerId && Number(winnerGoals) > 0) {
+      const p = byId(winnerId)
+      await addDoc(collection(db, 'manualGoals'), {
+        playerId: p.id, playerName: p.name, goals: Number(winnerGoals),
+        tournamentName, tournamentType, date, note: 'Winner', createdAt: Date.now(),
+      })
+      savedCount += 1
+    }
+    if (runnerUpId && Number(runnerUpGoals) > 0) {
+      const p = byId(runnerUpId)
+      await addDoc(collection(db, 'manualGoals'), {
+        playerId: p.id, playerName: p.name, goals: Number(runnerUpGoals),
+        tournamentName, tournamentType, date, note: 'Runner-up', createdAt: Date.now(),
+      })
+      savedCount += 1
+    }
+    for (const row of scorerRows) {
+      if (row.playerId && Number(row.goals) > 0) {
+        const p = byId(row.playerId)
+        await addDoc(collection(db, 'manualGoals'), {
+          playerId: p.id, playerName: p.name, goals: Number(row.goals),
+          tournamentName, tournamentType, date, note: 'Top scorer', createdAt: Date.now(),
+        })
+        savedCount += 1
+      }
+    }
+
+    if (winnerId) {
+      await addDoc(collection(db, 'champions'), {
+        tournamentName, format: tournamentType, championName: byId(winnerId)?.name || '', date, createdAt: Date.now(),
+      })
+    }
+
+    if (savedCount === 0) {
+      setMessage('Enter at least one player with goals greater than 0.')
+      setSaving(false)
+      return
+    }
+
+    setMessage(`Saved ${savedCount} goal entries for this tournament.`)
+    setTournamentName(''); setDate('')
+    setWinnerId(''); setWinnerGoals('')
+    setRunnerUpId(''); setRunnerUpGoals('')
+    setScorerRows(Array.from({ length: 10 }, () => ({ playerId: '', goals: '' })))
+    setSaving(false)
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <h3>Add historical tournament goals ⚽</h3>
+      <p className="meta" style={{ marginBottom: 12 }}>
+        For past tournaments where individual matches weren't tracked — enter final goal totals here.
+        Future tournaments count goals automatically from match scores.
+      </p>
+      <form className="form-grid" onSubmit={submit} style={{ maxWidth: 480 }}>
+        <div>
+          <label>Tournament name</label>
+          <input value={tournamentName} onChange={(e) => setTournamentName(e.target.value)} required />
+        </div>
+        <div>
+          <label>Tournament type</label>
+          <select value={tournamentType} onChange={(e) => setTournamentType(e.target.value)}>
+            {TOURNAMENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label>Date</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ flex: 2 }}>
+            <label>Winner</label>
+            <select value={winnerId} onChange={(e) => setWinnerId(e.target.value)}>
+              <option value="">Select player</option>
+              {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <label>Goals</label>
+            <input type="number" value={winnerGoals} onChange={(e) => setWinnerGoals(e.target.value)} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ flex: 2 }}>
+            <label>Runner-up</label>
+            <select value={runnerUpId} onChange={(e) => setRunnerUpId(e.target.value)}>
+              <option value="">Select player</option>
+              {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <label>Goals</label>
+            <input type="number" value={runnerUpGoals} onChange={(e) => setRunnerUpGoals(e.target.value)} />
+          </div>
+        </div>
+
+        <label style={{ marginTop: 8 }}>Top 10 goalscorers (leave rows blank if unused)</label>
+        {scorerRows.map((row, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8 }}>
+            <div style={{ flex: 2 }}>
+              <select value={row.playerId} onChange={(e) => updateRow(i, 'playerId', e.target.value)}>
+                <option value="">#{i + 1} — Select player</option>
+                {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <input type="number" placeholder="Goals" value={row.goals} onChange={(e) => updateRow(i, 'goals', e.target.value)} />
+            </div>
+          </div>
+        ))}
+
+        {message && <p className="error-text" style={{ color: 'var(--league)' }}>{message}</p>}
+        <button className="btn" type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Save historical goals'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 function FixtureResultRow({ match }) {
   const [score1, setScore1] = useState(match.score1 ?? '')
   const [score2, setScore2] = useState(match.score2 ?? '')
@@ -685,10 +880,12 @@ function AdminDashboard() {
       </div>
 
       <AddPlayer />
+      <BulkAddPlayers />
       <AutoFixtureGenerator players={players} />
       <TournamentProgress players={players} matches={matches} />
       <AddFixture players={players} />
       <RecordTournamentResult players={players} />
+      <HistoricalGoalsRecorder players={players} />
 
       <div className="card">
         <h3>Enter results</h3>
