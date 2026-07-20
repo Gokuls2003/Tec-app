@@ -10,18 +10,19 @@ export default function Home() {
   const top3 = standings.slice(0, 3)
 
   const recent = [...matches]
-    .filter((m) => m.completed)
+    .filter((m) => m.completed && !m.isBye)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
     .slice(0, 5)
 
   return (
     <>
       <section className="hero">
+        <div className="watermark">JOGA BONITO</div>
         <div className="eyebrow">Live standings</div>
-        <h1>Tamil eFootballers Ranking</h1>
+        <h1>Joga Bonito Ranking</h1>
         <p className="lede">
-          Every fixture, every result, one automated table. Track players, tournaments and who's
-          really on top this season.
+          Every fixture, every result, one automated table. Track players, tournament formats and
+          who's really on top this season.
         </p>
 
         {!pLoad && !mLoad && top3.length > 0 && (
@@ -53,10 +54,17 @@ export default function Home() {
               <span className="score">{m.score1} – {m.score2}</span>
               <span>{m.player2Name}</span>
             </div>
-            <div className="status">{m.tournamentName || 'Friendly'}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {m.format && <span className={`format-badge format-${formatSlug(m.format)}`}>{m.format}</span>}
+              <div className="status">{m.tournamentName || 'Friendly'}</div>
+            </div>
           </div>
         ))}
       </section>
     </>
   )
+}
+
+export function formatSlug(format) {
+  return (format || 'other').toLowerCase().replace(/\s+/g, '-')
 }
