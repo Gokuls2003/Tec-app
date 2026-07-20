@@ -1,9 +1,19 @@
+import { useState } from 'react'
 import { useCollection } from '../hooks/useCollection.js'
+import { formatSlug } from './Home.jsx'
+import { TOURNAMENT_TYPES } from '../utils/bdr.js'
+
+const FORMATS = ['All', ...TOURNAMENT_TYPES]
 
 export default function Fixtures() {
   const { data: matches, loading } = useCollection('matches')
+  const [activeFormat, setActiveFormat] = useState('All')
 
-  const byTournament = matches.reduce((acc, m) => {
+  const filtered = activeFormat === 'All'
+    ? matches
+    : matches.filter((m) => (m.format || 'Other') === activeFormat)
+
+  const byTournament = filtered.reduce((acc, m) => {
     const key = m.tournamentName || 'Friendly Matches'
     acc[key] = acc[key] || []
     acc[key].push(m)
@@ -14,12 +24,24 @@ export default function Fixtures() {
     <section className="section">
       <div className="section-head">
         <h2>Fixtures</h2>
-        <span className="num">{matches.length} total</span>
+        <span className="num">{filtered.length} total</span>
+      </div>
+
+      <div className="format-tabs">
+        {FORMATS.map((f) => (
+          <button
+            key={f}
+            className={`format-tab ${activeFormat === f ? 'active' : ''}`}
+            onClick={() => setActiveFormat(f)}
+          >
+            {f}
+          </button>
+        ))}
       </div>
 
       {loading && <p className="empty-state">Loading fixtures…</p>}
-      {!loading && matches.length === 0 && (
-        <p className="empty-state">No fixtures yet. Create matches from the Admin page.</p>
+      {!loading && filtered.length === 0 && (
+        <p className="empty-state">No fixtures in this format yet.</p>
       )}
 
       {Object.entries(byTournament).map(([tournament, list]) => (
@@ -36,8 +58,13 @@ export default function Fixtures() {
                 </span>
                 <span>{m.player2Name}</span>
               </div>
-              <div className="status">
-                {m.completed ? 'Full time' : 'Upcoming'}{m.round ? ` · ${m.round}` : ''}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {m.format && (
+                  <span className={`format-badge format-${formatSlug(m.format)}`}>{m.format}</span>
+                )}
+                <div className="status">
+                  {m.completed ? 'Full time' : 'Upcoming'}{m.round ? ` · ${m.round}` : ''}
+                </div>
               </div>
             </div>
           ))}
