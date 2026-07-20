@@ -14,6 +14,8 @@ import {
 import { auth, db } from '../firebase.js'
 import { useCollection } from '../hooks/useCollection.js'
 
+const FORMATS = ['UCL', 'Team League', 'Quick Combat', 'Co-op Tour']
+
 function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -53,14 +55,16 @@ function LoginForm() {
 function AddPlayer() {
   const [name, setName] = useState('')
   const [team, setTeam] = useState('')
+  const [position, setPosition] = useState('')
   const [saving, setSaving] = useState(false)
 
   const submit = async (e) => {
     e.preventDefault()
     setSaving(true)
-    await addDoc(collection(db, 'players'), { name, team, createdAt: Date.now() })
+    await addDoc(collection(db, 'players'), { name, team, position, createdAt: Date.now() })
     setName('')
     setTeam('')
+    setPosition('')
     setSaving(false)
   }
 
@@ -76,6 +80,10 @@ function AddPlayer() {
           <label>Team (optional)</label>
           <input value={team} onChange={(e) => setTeam(e.target.value)} />
         </div>
+        <div>
+          <label>Position (optional)</label>
+          <input value={position} onChange={(e) => setPosition(e.target.value)} placeholder="e.g. Forward, GK" />
+        </div>
         <button className="btn" type="submit" disabled={saving}>
           {saving ? 'Saving…' : 'Add player'}
         </button>
@@ -86,6 +94,7 @@ function AddPlayer() {
 
 function AddFixture({ players }) {
   const [tournamentName, setTournamentName] = useState('')
+  const [format, setFormat] = useState(FORMATS[0])
   const [round, setRound] = useState('')
   const [player1Id, setPlayer1Id] = useState('')
   const [player2Id, setPlayer2Id] = useState('')
@@ -100,6 +109,7 @@ function AddFixture({ players }) {
     const p2 = players.find((p) => p.id === player2Id)
     await addDoc(collection(db, 'matches'), {
       tournamentName,
+      format,
       round,
       player1Id,
       player1Name: p1?.name || '',
@@ -109,6 +119,7 @@ function AddFixture({ players }) {
       completed: false,
       score1: null,
       score2: null,
+      motm: null,
       createdAt: Date.now(),
     })
     setRound('')
@@ -121,7 +132,13 @@ function AddFixture({ players }) {
       <form className="form-grid" onSubmit={submit}>
         <div>
           <label>Tournament name</label>
-          <input value={tournamentName} onChange={(e) => setTournamentName(e.target.value)} placeholder="e.g. TEC Summer Cup" />
+          <input value={tournamentName} onChange={(e) => setTournamentName(e.target.value)} placeholder="e.g. Joga Bonito Summer Cup" />
+        </div>
+        <div>
+          <label>Format</label>
+          <select value={format} onChange={(e) => setFormat(e.target.value)}>
+            {FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
         </div>
         <div>
           <label>Round (optional)</label>
@@ -153,9 +170,63 @@ function AddFixture({ players }) {
   )
 }
 
+function AddChampion() {
+  const [tournamentName, setTournamentName] = useState('')
+  const [format, setFormat] = useState(FORMATS[0])
+  const [championName, setChampionName] = useState('')
+  const [date, setDate] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    await addDoc(collection(db, 'champions'), {
+      tournamentName,
+      format,
+      championName,
+      date,
+      createdAt: Date.now(),
+    })
+    setTournamentName('')
+    setChampionName('')
+    setDate('')
+    setSaving(false)
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <h3>Add champion 🏆</h3>
+      <form className="form-grid" onSubmit={submit}>
+        <div>
+          <label>Tournament name</label>
+          <input value={tournamentName} onChange={(e) => setTournamentName(e.target.value)} required />
+        </div>
+        <div>
+          <label>Format</label>
+          <select value={format} onChange={(e) => setFormat(e.target.value)}>
+            {FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+        </div>
+        <div>
+          <label>Champion (player/team name)</label>
+          <input value={championName} onChange={(e) => setChampionName(e.target.value)} required />
+        </div>
+        <div>
+          <label>Date</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <button className="btn" type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Add champion'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 function FixtureResultRow({ match }) {
   const [score1, setScore1] = useState(match.score1 ?? '')
   const [score2, setScore2] = useState(match.score2 ?? '')
+  const [motm, setMotm] = useState(match.motm || '')
 
   const saveResult = async () => {
     if (score1 === '' || score2 === '') return
@@ -163,6 +234,7 @@ function FixtureResultRow({ match }) {
       score1: Number(score1),
       score2: Number(score2),
       completed: true,
+      motm: motm || null,
     })
   }
 
@@ -171,27 +243,27 @@ function FixtureResultRow({ match }) {
   }
 
   return (
-    <div className="fixture-card">
-      <div className="players">
-        <span>{match.player1Name}</span>
-        <input
-          type="number"
-          value={score1}
-          onChange={(e) => setScore1(e.target.value)}
-          style={{ width: 56 }}
-        />
-        <span>–</span>
-        <input
-          type="number"
-          value={score2}
-          onChange={(e) => setScore2(e.target.value)}
-          style={{ width: 56 }}
-        />
-        <span>{match.player2Name}</span>
+    <div className="fixture-card" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div className="players">
+          <span>{match.player1Name}</span>
+          <input type="number" value={score1} onChange={(e) => setScore1(e.target.value)} style={{ width: 56 }} />
+          <span>–</span>
+          <input type="number" value={score2} onChange={(e) => setScore2(e.target.value)} style={{ width: 56 }} />
+          <span>{match.player2Name}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn" onClick={saveResult}>Save result</button>
+          <button className="btn secondary" onClick={removeFixture}>Delete</button>
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn" onClick={saveResult}>Save result</button>
-        <button className="btn secondary" onClick={removeFixture}>Delete</button>
+      <div style={{ marginTop: 10, maxWidth: 240 }}>
+        <label>MOTM (optional)</label>
+        <select value={motm} onChange={(e) => setMotm(e.target.value)}>
+          <option value="">None selected</option>
+          <option value={match.player1Id}>{match.player1Name}</option>
+          <option value={match.player2Id}>{match.player2Name}</option>
+        </select>
       </div>
     </div>
   )
@@ -210,6 +282,7 @@ function AdminDashboard() {
 
       <AddPlayer />
       <AddFixture players={players} />
+      <AddChampion />
 
       <div className="card">
         <h3>Enter results</h3>
