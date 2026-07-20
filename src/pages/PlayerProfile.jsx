@@ -1,3 +1,4 @@
+
 import { useParams, Link } from 'react-router-dom'
 import { useCollection } from '../hooks/useCollection.js'
 import { computePlayerStats, motmCount } from '../utils/playerStats.js'
@@ -9,6 +10,7 @@ export default function PlayerProfile() {
   const { data: players, loading: pLoad } = useCollection('players')
   const { data: matches, loading: mLoad } = useCollection('matches')
   const { data: champions } = useCollection('champions')
+  const { data: manualGoals } = useCollection('manualGoals')
 
   const player = players.find((p) => p.id === id)
 
@@ -18,6 +20,10 @@ export default function PlayerProfile() {
   const stats = computePlayerStats(id, matches)
   const motms = motmCount(id, matches)
   const trophies = champions.filter((c) => c.championName === player.name)
+  const manualGoalsTotal = manualGoals
+    .filter((g) => g.playerId === id)
+    .reduce((sum, g) => sum + (Number(g.goals) || 0), 0)
+  const totalGoals = stats.goalsFor + manualGoalsTotal
 
   return (
     <section className="section">
@@ -47,7 +53,7 @@ export default function PlayerProfile() {
           ['Draws', stats.draws],
           ['Losses', stats.losses],
           ['Win rate', `${stats.winRate}%`],
-          ['Goals for', stats.goalsFor],
+          ['Total goals', totalGoals],
           ['Goals against', stats.goalsAgainst],
           ['Clean sheets', stats.cleanSheets],
           ['Win streak', stats.streak],
@@ -104,5 +110,3 @@ export default function PlayerProfile() {
     </section>
   )
 }
-
-export { colorFromName }
