@@ -482,4 +482,234 @@ function RecordTournamentResult({ players }) {
       championLabel = winningTeam
     } else {
       const byId = (id) => players.find((p) => p.id === id)
-      winnerIds.forEach((id) => 
+      winnerIds.forEach((id) => {
+        const p = byId(id)
+        if (p) bdrEntries.push({ playerId: p.id, playerName: p.name, points: table.winner, reason: 'Winner' })
+      })
+      runnerUpIds.forEach((id) => {
+        const p = byId(id)
+        if (p) bdrEntries.push({ playerId: p.id, playerName: p.name, points: table.runnerUp, reason: 'Runner-up' })
+      })
+      thirdFourthIds.forEach((id) => {
+        const p = byId(id)
+        if (p) bdrEntries.push({ playerId: p.id, playerName: p.name, points: table.thirdFourth, reason: '3rd/4th place' })
+      })
+      quarterfinalistIds.forEach((id) => {
+        const p = byId(id)
+        if (p) bdrEntries.push({ playerId: p.id, playerName: p.name, points: table.quarterfinal, reason: 'Quarterfinal (R8)' })
+      })
+      goldenBootIds.forEach((id) => {
+        const p = byId(id)
+        if (p) bdrEntries.push({ playerId: p.id, playerName: p.name, points: table.goldenBoot, reason: `Golden Boot (${goldenBootGoals || 0} goals)` })
+      })
+      if (isUCL && groupTopperId) {
+        const p = byId(groupTopperId)
+        if (p) bdrEntries.push({ playerId: p.id, playerName: p.name, points: table.groupTopBonus, reason: 'Group stage top finisher bonus' })
+      }
+      championLabel = winnerIds.map((id) => byId(id)?.name).filter(Boolean).join(' & ')
+    }
+
+    if (bdrEntries.length === 0) {
+      setMessage('Select at least a winner before saving.')
+      setSaving(false)
+      return
+    }
+
+    for (const entry of bdrEntries) {
+      await addDoc(collection(db, 'bdrPoints'), {
+        ...entry, tournamentName, tournamentType, date, createdAt: Date.now(),
+      })
+    }
+
+    if (championLabel) {
+      await addDoc(collection(db, 'champions'), {
+        tournamentName, format: tournamentType, championName: championLabel, date, createdAt: Date.now(),
+      })
+    }
+
+    setMessage(`Saved — ${bdrEntries.length} BDR point entries recorded.`)
+    setTournamentName('')
+    setWinningTeam(''); setRunnerUpTeam(''); setThirdTeam(''); setFourthTeam('')
+    setWinnerIds([]); setRunnerUpIds([]); setThirdFourthIds([]); setQuarterfinalistIds([])
+    setGoldenBootIds([]); setGoldenBootGoals(''); setGroupTopperId('')
+    setSaving(false)
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <h3>Record tournament result & BDR points 🏆</h3>
+      <form className="form-grid" onSubmit={submit} style={{ maxWidth: 480 }}>
+        <div>
+          <label>Tournament name</label>
+          <input value={tournamentName} onChange={(e) => setTournamentName(e.target.value)} required />
+        </div>
+        <div>
+          <label>Tournament type</label>
+          <select value={tournamentType} onChange={(e) => setTournamentType(e.target.value)}>
+            {TOURNAMENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label>Date</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+
+        {isTeamLeague ? (
+          <>
+            <div>
+              <label>Winning team ({table.winner} pts each player)</label>
+              <select value={winningTeam} onChange={(e) => setWinningTeam(e.target.value)}>
+                <option value="">Select team</option>
+                {teamNames.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label>Runner-up team ({table.runnerUp} pts each player)</label>
+              <select value={runnerUpTeam} onChange={(e) => setRunnerUpTeam(e.target.value)}>
+                <option value="">Select team</option>
+                {teamNames.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label>3rd place team ({table.third} pts each player)</label>
+              <select value={thirdTeam} onChange={(e) => setThirdTeam(e.target.value)}>
+                <option value="">Select team</option>
+                {teamNames.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label>4th place team ({table.fourth} pts each player)</label>
+              <select value={fourthTeam} onChange={(e) => setFourthTeam(e.target.value)}>
+                <option value="">Select team</option>
+                {teamNames.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          </>
+        ) : (
+          <>
+            <PlayerChecklist players={players} selectedIds={winnerIds} onToggle={toggle(setWinnerIds)} label={`Winner(s) (${table.winner} pts each)`} />
+            <PlayerChecklist players={players} selectedIds={runnerUpIds} onToggle={toggle(setRunnerUpIds)} label={`Runner-up(s) (${table.runnerUp} pts each)`} />
+            <PlayerChecklist players={players} selectedIds={thirdFourthIds} onToggle={toggle(setThirdFourthIds)} label={`3rd/4th place (${table.thirdFourth} pts each)`} />
+            <PlayerChecklist players={players} selectedIds={quarterfinalistIds} onToggle={toggle(setQuarterfinalistIds)} label={`Quarterfinalists / R8 (${table.quarterfinal} pts each)`} />
+            <PlayerChecklist players={players} selectedIds={goldenBootIds} onToggle={toggle(setGoldenBootIds)} label={`Golden Boot (${table.goldenBoot} pts each)`} />
+            <div>
+              <label>Golden Boot goals scored</label>
+              <input type="number" value={goldenBootGoals} onChange={(e) => setGoldenBootGoals(e.target.value)} />
+            </div>
+            {isUCL && (
+              <div>
+                <label>Group stage top finisher (+{table.groupTopBonus} bonus pts)</label>
+                <select value={groupTopperId} onChange={(e) => setGroupTopperId(e.target.value)}>
+                  <option value="">None</option>
+                  {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+            )}
+          </>
+        )}
+
+        {message && <p className="error-text" style={{ color: 'var(--league)' }}>{message}</p>}
+        <button className="btn" type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Save result & award BDR points'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function FixtureResultRow({ match }) {
+  const [score1, setScore1] = useState(match.score1 ?? '')
+  const [score2, setScore2] = useState(match.score2 ?? '')
+  const [motm, setMotm] = useState(match.motm || '')
+
+  const saveResult = async () => {
+    if (score1 === '' || score2 === '') return
+    await updateDoc(doc(db, 'matches', match.id), {
+      score1: Number(score1), score2: Number(score2), completed: true, motm: motm || null,
+    })
+  }
+
+  const removeFixture = async () => {
+    await deleteDoc(doc(db, 'matches', match.id))
+  }
+
+  if (match.isBye) {
+    return (
+      <div className="fixture-card">
+        <div className="players">
+          <span>{match.player1Name}</span>
+          <span className="score">BYE</span>
+        </div>
+        <div className="status">{match.round}</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixture-card" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div className="players">
+          <span>{match.player1Name}</span>
+          <input type="number" value={score1} onChange={(e) => setScore1(e.target.value)} style={{ width: 56 }} />
+          <span>–</span>
+          <input type="number" value={score2} onChange={(e) => setScore2(e.target.value)} style={{ width: 56 }} />
+          <span>{match.player2Name}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn" onClick={saveResult}>Save result</button>
+          <button className="btn secondary" onClick={removeFixture}>Delete</button>
+        </div>
+      </div>
+      <div className="meta" style={{ marginTop: 4 }}>{match.tournamentName} {match.round && `· ${match.round}`}</div>
+      <div style={{ marginTop: 10, maxWidth: 240 }}>
+        <label>MOTM (optional)</label>
+        <select value={motm} onChange={(e) => setMotm(e.target.value)}>
+          <option value="">None selected</option>
+          <option value={match.player1Id}>{match.player1Name}</option>
+          <option value={match.player2Id}>{match.player2Name}</option>
+        </select>
+      </div>
+    </div>
+  )
+}
+
+function AdminDashboard() {
+  const { data: players } = useCollection('players')
+  const { data: matches } = useCollection('matches')
+
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h2>Admin</h2>
+        <button className="btn secondary" onClick={() => signOut(auth)}>Log out</button>
+      </div>
+
+      <AddPlayer />
+      <AutoFixtureGenerator players={players} />
+      <TournamentProgress players={players} matches={matches} />
+      <AddFixture players={players} />
+      <RecordTournamentResult players={players} />
+
+      <div className="card">
+        <h3>Enter results</h3>
+        {matches.length === 0 && <p className="empty-state">No fixtures yet — generate some above.</p>}
+        {matches.map((m) => <FixtureResultRow key={m.id} match={m} />)}
+      </div>
+    </section>
+  )
+}
+
+export default function Admin() {
+  const [user, setUser] = useState(undefined)
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u))
+    return () => unsub()
+  }, [])
+
+  if (user === undefined) {
+    return <p className="empty-state">Checking session…</p>
+  }
+
+  return user ? <AdminDashboard /> : <LoginForm />
+}
