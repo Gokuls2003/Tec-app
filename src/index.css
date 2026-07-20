@@ -329,3 +329,4 @@ button.btn.secondary {
 
 .card { display: block; }
 a.card:hover { border-color: var(--gold); }
+.format-invictus-ucl { background: var(--ucl); color: white; }
