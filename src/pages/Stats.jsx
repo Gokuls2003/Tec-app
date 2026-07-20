@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useCollection } from '../hooks/useCollection.js'
 import { computePlayerStats, motmCount } from '../utils/playerStats.js'
+import { combineGoalTotals } from '../utils/goals.js'
 import { colorFromName, initials } from '../utils/avatar.js'
 
 function Leaderboard({ title, rows, valueLabel }) {
@@ -29,8 +30,9 @@ function Leaderboard({ title, rows, valueLabel }) {
 export default function Stats() {
   const { data: players, loading: pLoad } = useCollection('players')
   const { data: matches, loading: mLoad } = useCollection('matches')
+  const { data: manualGoals, loading: gLoad } = useCollection('manualGoals')
 
-  if (pLoad || mLoad) return <p className="empty-state">Crunching stats…</p>
+  if (pLoad || mLoad || gLoad) return <p className="empty-state">Crunching stats…</p>
 
   const withStats = players.map((p) => ({
     ...p,
@@ -38,11 +40,8 @@ export default function Stats() {
     motms: motmCount(p.id, matches),
   }))
 
-  const topScorers = [...withStats]
-    .filter((p) => p.stats.goalsFor > 0)
-    .sort((a, b) => b.stats.goalsFor - a.stats.goalsFor)
-    .slice(0, 10)
-    .map((p) => ({ id: p.id, name: p.name, value: p.stats.goalsFor }))
+  const goldenBootTotals = combineGoalTotals(players, matches, manualGoals)
+  const topScorers = goldenBootTotals.slice(0, 10).map((g) => ({ id: g.id, name: g.name, value: g.goals }))
 
   const cleanSheetLeaders = [...withStats]
     .filter((p) => p.stats.cleanSheets > 0)
@@ -66,7 +65,7 @@ export default function Stats() {
     <section className="section">
       <div className="section-head">
         <h2>Statistics</h2>
-        <span className="num">Auto-calculated from results</span>
+        <span className="num">Auto-calculated + historical results</span>
       </div>
       <Leaderboard title="Golden Boot 🥇" rows={topScorers} valueLabel="goals" />
       <Leaderboard title="Golden Glove 🧤" rows={cleanSheetLeaders} valueLabel="clean sheets" />
