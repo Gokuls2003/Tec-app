@@ -5,22 +5,26 @@ import { colorFromName, initials } from '../utils/avatar.js'
 
 export default function BallonDor() {
   const { data: bdrPoints, loading } = useCollection('bdrPoints')
-  const leaderboard = aggregateBdr(bdrPoints)
+  const { data: winners, loading: wLoad } = useCollection('ballonDorWinners')
+
+  const currentSeasonPoints = bdrPoints.filter((p) => !p.seasonClosed)
+  const leaderboard = aggregateBdr(currentSeasonPoints)
+  const sortedWinners = [...winners].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 
   return (
     <section className="section">
       <div className="section-head">
-        <h2>Ballon d'Or Rankings</h2>
-        <span className="num">BDR points · updates live</span>
+        <h2>Ballon d'Or</h2>
+        <span className="num">Current season BDR · updates live</span>
       </div>
 
       {loading && <p className="empty-state">Loading rankings…</p>}
       {!loading && leaderboard.length === 0 && (
-        <p className="empty-state">No BDR points recorded yet — record a tournament result from Admin.</p>
+        <p className="empty-state">No BDR points recorded yet this season.</p>
       )}
 
       {!loading && leaderboard.length > 0 && (
-        <div className="table-wrap">
+        <div className="table-wrap" style={{ marginBottom: 36 }}>
           <table className="rank-table">
             <thead>
               <tr>
@@ -50,6 +54,24 @@ export default function BallonDor() {
           </table>
         </div>
       )}
+
+      <div className="section-head">
+        <h2>Hall of Fame 🏆</h2>
+        <span className="num">Past Ballon d'Or winners</span>
+      </div>
+      {wLoad && <p className="empty-state">Loading…</p>}
+      {!wLoad && sortedWinners.length === 0 && (
+        <p className="empty-state">No season has been completed yet.</p>
+      )}
+      {sortedWinners.map((w) => (
+        <div className="champion-card" key={w.id}>
+          <div className="champion-trophy">🥇</div>
+          <div className="champion-info">
+            <h3>{w.playerName}</h3>
+            <div className="meta">{w.seasonName} · {w.points} BDR points{w.date && ` · ${w.date}`}</div>
+          </div>
+        </div>
+      ))}
     </section>
   )
 }
