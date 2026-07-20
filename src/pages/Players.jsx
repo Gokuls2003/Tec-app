@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useCollection } from '../hooks/useCollection.js'
+import { colorFromName, initials } from '../utils/avatar.js'
 
 export default function Players() {
   const { data: players, loading } = useCollection('players')
@@ -31,10 +33,17 @@ export default function Players() {
 
       <div className="grid">
         {filtered.map((p) => (
-          <div className="card" key={p.id}>
-            <h3>{p.name}</h3>
-            <div className="meta">{p.team || 'No team set'}</div>
-          </div>
+          <Link to={`/players/${p.id}`} key={p.id} className="card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div className="avatar" style={{ background: colorFromName(p.name) }}>
+                {initials(p.name)}
+              </div>
+              <div>
+                <h3 style={{ margin: 0 }}>{p.name}</h3>
+                <div className="meta">{p.team || 'No team'} {p.position && `· ${p.position}`}</div>
+              </div>
+            </div>
+          </Link>
         ))}
       </div>
     </section>
