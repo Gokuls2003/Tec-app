@@ -330,3 +330,14 @@ button.btn.secondary {
 .card { display: block; }
 a.card:hover { border-color: var(--gold); }
 .format-invictus-ucl { background: var(--ucl); color: white; }
+textarea {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-size: 15px;
+  width: 100%;
+  font-family: var(--body);
+  resize: vertical;
+}
