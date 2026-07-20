@@ -308,3 +308,24 @@ button.btn.secondary {
   padding: 30px 0;
   text-align: center;
 }
+/* ---------- Avatars & form pips (added) ---------- */
+.avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-size: 16px; font-weight: 700;
+  color: white; flex-shrink: 0;
+}
+.avatar-lg { width: 84px; height: 84px; font-size: 30px; }
+
+.form-pips { display: flex; gap: 5px; }
+.form-pip {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 11px; font-weight: 700; color: #0c1712;
+}
+.form-pip.w { background: var(--league); }
+.form-pip.d { background: var(--other); }
+.form-pip.l { background: var(--red); }
+
+.card { display: block; }
+a.card:hover { border-color: var(--gold); }
