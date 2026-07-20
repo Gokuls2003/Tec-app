@@ -12,6 +12,7 @@ export default function Navbar() {
     { to: '/rankings', label: 'Rankings' },
     { to: '/stats', label: 'Stats' },
     { to: '/champions', label: 'Champions' },
+    { to: '/balondor', label: "Ballon d'Or" },
     { to: '/search', label: 'Search' },
     { to: '/about', label: 'About' },
     { to: '/contact', label: 'Contact' },
