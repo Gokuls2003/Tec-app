@@ -460,6 +460,33 @@ function FixtureResultRow({ match }) {
 function AdminDashboard() {
   const { data: players } = useCollection('players')
   const { data: matches } = useCollection('matches')
+  const [selectedPlayers, setSelectedPlayers] = useState([]);
+  const togglePlayer = (id) => {
+  setSelectedPlayers((prev) =>
+    prev.includes(id)
+      ? prev.filter((x) => x !== id)
+      : [...prev, id]
+  );
+};
+
+const selectAllPlayers = () => {
+  setSelectedPlayers(players.map((p) => p.id));
+};
+
+const clearSelection = () => {
+  setSelectedPlayers([]);
+};
+
+const deleteSelectedPlayers = async () => {
+  const batch = writeBatch(db);
+
+  selectedPlayers.forEach((id) => {
+    batch.delete(doc(db, "players", id));
+  });
+
+  await batch.commit();
+  setSelectedPlayers([]);
+};
 
   return (
     <section className="section">
