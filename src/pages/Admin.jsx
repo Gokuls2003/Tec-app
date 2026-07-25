@@ -49,9 +49,10 @@ function BulkAddPlayers() {
     const names = namesText.split(/[\n,]+/).map((n) => n.trim()).filter(Boolean)
     if (names.length === 0) { setMessage('Paste at least one name.'); return }
     setSaving(true)
-    for (const name of names) {
-      await addDoc(collection(db, 'players'), { name, createdAt: Date.now() })
-    }
+    setMessage(`Adding ${names.length} players…`)
+    await Promise.all(
+      names.map((name) => addDoc(collection(db, 'players'), { name, createdAt: Date.now() }))
+    )
     setMessage(`Added ${names.length} players.`)
     setNamesText('')
     setSaving(false)
@@ -63,7 +64,7 @@ function BulkAddPlayers() {
       <form className="form-grid" onSubmit={submit}>
         <div>
           <label>Names (one per line, or comma separated)</label>
-          <textarea rows="6" value={namesText} onChange={(e) => setNamesText(e.target.value)} placeholder={'Player One\nPlayer Two\nPlayer Three'} />
+          <textarea rows="8" value={namesText} onChange={(e) => setNamesText(e.target.value)} placeholder={'Player One\nPlayer Two\nPlayer Three'} />
         </div>
         {message && <p className="error-text" style={{ color: 'var(--league)' }}>{message}</p>}
         <button className="btn" type="submit" disabled={saving}>{saving ? 'Adding…' : 'Add players'}</button>
@@ -84,6 +85,8 @@ function AutoFixtureGenerator({ players }) {
   const toggle = (id) => {
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
   }
+  const selectAll = () => setSelectedIds(players.map((p) => p.id))
+  const clearAll = () => setSelectedIds([])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -96,55 +99,59 @@ function AutoFixtureGenerator({ players }) {
     if (!tournamentName.trim()) { setMessage('Enter a tournament name.'); return }
 
     setSaving(true)
+    setMessage('Generating fixtures…')
 
     if (structure === 'league') {
       const pairs = roundRobinPairs(selected)
-      for (const [p1, p2] of pairs) {
-        await addDoc(collection(db, 'matches'), {
+      await Promise.all(pairs.map(([p1, p2]) =>
+        addDoc(collection(db, 'matches'), {
           tournamentName, round: 'Round Robin', structure: 'league',
           player1Id: p1.id, player1Name: p1.name, player2Id: p2.id, player2Name: p2.name,
           date: '', completed: false, score1: null, score2: null, createdAt: Date.now(),
         })
-      }
+      ))
       setMessage(`Generated ${pairs.length} round-robin fixtures.`)
     }
 
     if (structure === 'knockout') {
-      const { pairs, byePlayer } = pairKnockoutRound(selected)
-      const label = roundLabel(selected.length)
-      for (const [p1, p2] of pairs) {
-        await addDoc(collection(db, 'matches'), {
-          tournamentName, round: label, structure: 'knockout', stageOrder: 1,
-          player1Id: p1.id, player1Name: p1.name, player2Id: p2.id, player2Name: p2.name,
-          date: '', completed: false, score1: null, score2: null, createdAt: Date.now(),
-        })
-      }
-      if (byePlayer) {
-        await addDoc(collection(db, 'matches'), {
-          tournamentName, round: label, structure: 'knockout', stageOrder: 1,
-          player1Id: byePlayer.id, player1Name: byePlayer.name, player2Id: null, player2Name: 'BYE',
-          date: '', completed: true, isBye: true, score1: 1, score2: 0, createdAt: Date.now(),
-        })
-      }
-      setMessage(`Generated ${label} bracket with ${pairs.length} matches${byePlayer ? ' + 1 bye' : ''}.`)
+      const { pairs, byePlayers, bracketSize } = pairKnockoutRound(selected)
+      const label = roundLabel(bracketSize)
+      await Promise.all([
+        ...pairs.map(([p1, p2]) =>
+          addDoc(collection(db, 'matches'), {
+            tournamentName, round: label, structure: 'knockout', stageOrder: 1,
+            player1Id: p1.id, player1Name: p1.name, player2Id: p2.id, player2Name: p2.name,
+            date: '', completed: false, score1: null, score2: null, createdAt: Date.now(),
+          })
+        ),
+        ...byePlayers.map((p) =>
+          addDoc(collection(db, 'matches'), {
+            tournamentName, round: label, structure: 'knockout', stageOrder: 1,
+            player1Id: p.id, player1Name: p.name, player2Id: null, player2Name: 'BYE',
+            date: '', completed: true, isBye: true, score1: 1, score2: 0, createdAt: Date.now(),
+          })
+        ),
+      ])
+      setMessage(`Generated ${label} bracket (${bracketSize} slots): ${pairs.length} matches${byePlayers.length ? ` + ${byePlayers.length} byes` : ''}.`)
     }
 
     if (structure === 'group') {
       const groups = makeGroups(selected, Number(groupSize))
-      let count = 0
-      for (let gi = 0; gi < groups.length; gi++) {
-        const pairs = roundRobinPairs(groups[gi])
-        for (const [p1, p2] of pairs) {
-          await addDoc(collection(db, 'matches'), {
-            tournamentName, round: `Group ${String.fromCharCode(65 + gi)}`,
-            structure: 'group', groupIndex: gi, qualifiersPerGroup: Number(qualifiersPerGroup),
-            player1Id: p1.id, player1Name: p1.name, player2Id: p2.id, player2Name: p2.name,
-            date: '', completed: false, score1: null, score2: null, createdAt: Date.now(),
-          })
-          count += 1
-        }
-      }
-      setMessage(`Generated ${groups.length} groups, ${count} fixtures total.`)
+      const allPairs = []
+      groups.forEach((group, gi) => {
+        roundRobinPairs(group).forEach(([p1, p2]) => {
+          allPairs.push({ p1, p2, gi })
+        })
+      })
+      await Promise.all(allPairs.map(({ p1, p2, gi }) =>
+        addDoc(collection(db, 'matches'), {
+          tournamentName, round: `Group ${String.fromCharCode(65 + gi)}`,
+          structure: 'group', groupIndex: gi, qualifiersPerGroup: Number(qualifiersPerGroup),
+          player1Id: p1.id, player1Name: p1.name, player2Id: p2.id, player2Name: p2.name,
+          date: '', completed: false, score1: null, score2: null, createdAt: Date.now(),
+        })
+      ))
+      setMessage(`Generated ${groups.length} groups, ${allPairs.length} fixtures total.`)
     }
 
     setSaving(false)
@@ -158,7 +165,7 @@ function AutoFixtureGenerator({ players }) {
         <div>
           <label>Structure</label>
           <select value={structure} onChange={(e) => setStructure(e.target.value)}>
-            <option value="knockout">Knockout</option>
+            <option value="knockout">Knockout (any size — 16/32/64/128/256...)</option>
             <option value="group">Group Stage + Knockout</option>
             <option value="league">League (Round Robin)</option>
           </select>
@@ -171,7 +178,11 @@ function AutoFixtureGenerator({ players }) {
         )}
         <div>
           <label>Select players ({selectedIds.length} selected)</label>
-          <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 4, padding: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+            <button type="button" className="btn secondary" onClick={selectAll}>Select all</button>
+            <button type="button" className="btn secondary" onClick={clearAll}>Clear</button>
+          </div>
+          <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 4, padding: 8 }}>
             {players.map((p) => (
               <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, textTransform: 'none', fontSize: 14, color: 'var(--text)', padding: '4px 0' }}>
                 <input type="checkbox" checked={selectedIds.includes(p.id)} onChange={() => toggle(p.id)} style={{ width: 'auto' }} />
@@ -197,6 +208,7 @@ function TournamentProgress({ players, matches }) {
     const maxStage = Math.max(...koMatches.map((m) => m.stageOrder || 1))
     const currentRound = koMatches.filter((m) => (m.stageOrder || 1) === maxStage)
     if (!currentRound.every((m) => m.completed)) { alert('Not all matches in the current round are scored yet.'); return }
+
     const winners = currentRound.map((m) => {
       if (m.isBye) return { id: m.player1Id, name: m.player1Name }
       if (Number(m.score1) > Number(m.score2)) return { id: m.player1Id, name: m.player1Name }
@@ -204,26 +216,28 @@ function TournamentProgress({ players, matches }) {
       return null
     }).filter(Boolean)
 
-    if (winners.length <= 1) { alert(`🏆 Tournament complete! Champion: ${winners[0]?.name}`); return }
+    if (winners.length <= 1) { alert(`🏆 Tournament complete! Champion: ${winners[0]?.name}. Record it in "Record tournament result" below.`); return }
 
-    const { pairs, byePlayer } = pairKnockoutRound(winners)
-    const label = roundLabel(winners.length)
+    const { pairs, byePlayers, bracketSize } = pairKnockoutRound(winners)
+    const label = roundLabel(bracketSize)
     const nextStage = maxStage + 1
 
-    for (const [p1, p2] of pairs) {
-      await addDoc(collection(db, 'matches'), {
-        tournamentName, round: label, structure: 'knockout', stageOrder: nextStage,
-        player1Id: p1.id, player1Name: p1.name, player2Id: p2.id, player2Name: p2.name,
-        date: '', completed: false, score1: null, score2: null, createdAt: Date.now(),
-      })
-    }
-    if (byePlayer) {
-      await addDoc(collection(db, 'matches'), {
-        tournamentName, round: label, structure: 'knockout', stageOrder: nextStage,
-        player1Id: byePlayer.id, player1Name: byePlayer.name, player2Id: null, player2Name: 'BYE',
-        date: '', completed: true, isBye: true, score1: 1, score2: 0, createdAt: Date.now(),
-      })
-    }
+    await Promise.all([
+      ...pairs.map(([p1, p2]) =>
+        addDoc(collection(db, 'matches'), {
+          tournamentName, round: label, structure: 'knockout', stageOrder: nextStage,
+          player1Id: p1.id, player1Name: p1.name, player2Id: p2.id, player2Name: p2.name,
+          date: '', completed: false, score1: null, score2: null, createdAt: Date.now(),
+        })
+      ),
+      ...byePlayers.map((p) =>
+        addDoc(collection(db, 'matches'), {
+          tournamentName, round: label, structure: 'knockout', stageOrder: nextStage,
+          player1Id: p.id, player1Name: p.name, player2Id: null, player2Name: 'BYE',
+          date: '', completed: true, isBye: true, score1: 1, score2: 0, createdAt: Date.now(),
+        })
+      ),
+    ])
   }
 
   const generateKnockoutFromGroups = async (tournamentName) => {
@@ -241,23 +255,25 @@ function TournamentProgress({ players, matches }) {
       qualifiers.push(...standings.slice(0, qualifiersPerGroup).map((s) => ({ id: s.id, name: s.name })))
     })
 
-    const { pairs, byePlayer } = pairKnockoutRound(qualifiers)
-    const label = roundLabel(qualifiers.length)
+    const { pairs, byePlayers, bracketSize } = pairKnockoutRound(qualifiers)
+    const label = roundLabel(bracketSize)
 
-    for (const [p1, p2] of pairs) {
-      await addDoc(collection(db, 'matches'), {
-        tournamentName, round: label, structure: 'knockout', stageOrder: 1,
-        player1Id: p1.id, player1Name: p1.name, player2Id: p2.id, player2Name: p2.name,
-        date: '', completed: false, score1: null, score2: null, createdAt: Date.now(),
-      })
-    }
-    if (byePlayer) {
-      await addDoc(collection(db, 'matches'), {
-        tournamentName, round: label, structure: 'knockout', stageOrder: 1,
-        player1Id: byePlayer.id, player1Name: byePlayer.name, player2Id: null, player2Name: 'BYE',
-        date: '', completed: true, isBye: true, score1: 1, score2: 0, createdAt: Date.now(),
-      })
-    }
+    await Promise.all([
+      ...pairs.map(([p1, p2]) =>
+        addDoc(collection(db, 'matches'), {
+          tournamentName, round: label, structure: 'knockout', stageOrder: 1,
+          player1Id: p1.id, player1Name: p1.name, player2Id: p2.id, player2Name: p2.name,
+          date: '', completed: false, score1: null, score2: null, createdAt: Date.now(),
+        })
+      ),
+      ...byePlayers.map((p) =>
+        addDoc(collection(db, 'matches'), {
+          tournamentName, round: label, structure: 'knockout', stageOrder: 1,
+          player1Id: p.id, player1Name: p.name, player2Id: null, player2Name: 'BYE',
+          date: '', completed: true, isBye: true, score1: 1, score2: 0, createdAt: Date.now(),
+        })
+      ),
+    ])
   }
 
   return (
@@ -281,6 +297,80 @@ function TournamentProgress({ players, matches }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+const POSITION_LABELS = ['1st (Winner)', '2nd (Runner-up)', '3rd', '4th', '5th', '6th', '7th', '8th']
+
+function RecordTournamentResult({ players }) {
+  const [tournamentName, setTournamentName] = useState('')
+  const [date, setDate] = useState('')
+  const [rows, setRows] = useState(POSITION_LABELS.map(() => ({ playerId: '', goals: '' })))
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const updateRow = (i, field, value) => {
+    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)))
+  }
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setMessage('')
+    if (!tournamentName.trim()) { setMessage('Enter a tournament name.'); return }
+
+    const byId = (id) => players.find((p) => p.id === id)
+    const positions = rows
+      .map((r, i) => ({
+        position: i + 1,
+        label: POSITION_LABELS[i],
+        playerId: r.playerId,
+        playerName: byId(r.playerId)?.name || '',
+        goals: Number(r.goals) || 0,
+      }))
+      .filter((r) => r.playerId)
+
+    if (positions.length === 0) { setMessage('Fill in at least the winner.'); return }
+
+    setSaving(true)
+    await addDoc(collection(db, 'tournamentResults'), {
+      tournamentName, date, positions, createdAt: Date.now(),
+    })
+    setMessage(`Saved result for ${tournamentName} — ${positions.length} positions recorded.`)
+    setTournamentName(''); setDate('')
+    setRows(POSITION_LABELS.map(() => ({ playerId: '', goals: '' })))
+    setSaving(false)
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <h3>Record tournament result 🏆</h3>
+      <p className="meta" style={{ marginBottom: 12 }}>
+        Enter final placings and goals scored. The highest goal count is automatically marked Golden Boot for this tournament.
+      </p>
+      <form className="form-grid" onSubmit={submit} style={{ maxWidth: 520 }}>
+        <div><label>Tournament name</label><input value={tournamentName} onChange={(e) => setTournamentName(e.target.value)} required /></div>
+        <div><label>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+
+        {POSITION_LABELS.map((label, i) => (
+          <div key={label} style={{ display: 'flex', gap: 8 }}>
+            <div style={{ flex: 2 }}>
+              <label>{label}</label>
+              <select value={rows[i].playerId} onChange={(e) => updateRow(i, 'playerId', e.target.value)}>
+                <option value="">Select player</option>
+                {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label>Goals</label>
+              <input type="number" value={rows[i].goals} onChange={(e) => updateRow(i, 'goals', e.target.value)} />
+            </div>
+          </div>
+        ))}
+
+        {message && <p className="error-text" style={{ color: 'var(--league)' }}>{message}</p>}
+        <button className="btn" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save tournament result'}</button>
+      </form>
     </div>
   )
 }
@@ -337,6 +427,7 @@ function AdminDashboard() {
       <BulkAddPlayers />
       <AutoFixtureGenerator players={players} />
       <TournamentProgress players={players} matches={matches} />
+      <RecordTournamentResult players={players} />
       <div className="card">
         <h3>Enter results</h3>
         {matches.length === 0 && <p className="empty-state">No fixtures yet — generate some above.</p>}
@@ -356,4 +447,4 @@ export default function Admin() {
 
   if (user === undefined) return <p className="empty-state">Checking session…</p>
   return user ? <AdminDashboard /> : <LoginForm />
-                       }
+                                     }
