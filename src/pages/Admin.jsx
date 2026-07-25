@@ -1,9 +1,10 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, writeBatch } from 'firebase/
+import { useEffect, useState } from 'react'
+import {
   signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
 } from 'firebase/auth'
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore'
+import { collection, addDoc, updateDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore'
 import { auth, db } from '../firebase.js'
 import { useCollection } from '../hooks/useCollection.js'
 import { computeStandings } from '../utils/rankings.js'
@@ -50,7 +51,6 @@ function BulkAddPlayers() {
     setSaving(true)
     setMessage(`Adding ${names.length} players…`)
 
-    // Firestore batches max out at 500 writes — chunk if needed.
     const chunks = []
     for (let i = 0; i < names.length; i += 450) {
       chunks.push(names.slice(i, i + 450))
@@ -459,4 +459,4 @@ export default function Admin() {
 
   if (user === undefined) return <p className="empty-state">Checking session…</p>
   return user ? <AdminDashboard /> : <LoginForm />
-                                     }
+}
