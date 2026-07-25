@@ -468,7 +468,37 @@ function AdminDashboard() {
         <button className="btn secondary" onClick={() => signOut(auth)}>Log out</button>
       </div>
       <BulkAddPlayers />
-      <AutoFixtureGenerator players={players} />
+
+<div className="card" style={{ marginBottom: 20 }}>
+  <h3>Players</h3>
+
+  {players.map((player) => (
+    <div
+      key={player.id}
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 8,
+      }}
+    >
+      <span>{player.name}</span>
+
+      <button
+        className="btn secondary"
+        onClick={async () => {
+          if (window.confirm(`Delete ${player.name}?`)) {
+            await deleteDoc(doc(db, "players", player.id));
+          }
+        }}
+      >
+        Delete
+      </button>
+    </div>
+  ))}
+</div>
+
+<AutoFixtureGenerator players={players} />
       <TournamentProgress players={players} matches={matches} />
       <RecordTournamentResult players={players} />
       <div className="card">
