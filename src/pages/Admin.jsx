@@ -1,5 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore'
-import {
+import { collection, addDoc, updateDoc, deleteDoc, doc, writeBatch } from 'firebase/
   signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
