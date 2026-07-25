@@ -71,42 +71,34 @@ function BulkAddPlayers() {
   setMessage(`Adding ${names.length} players...`);
 
   try {
-    const batchSize = 500;
+  const batchSize = 500;
+  const promises = [];
 
-    const promises = [];
+  for (let i = 0; i < names.length; i += batchSize) {
+    const batch = writeBatch(db);
 
-    for (let i = 0; i < names.length; i += batchSize) {
-      const batch = writeBatch(db);
-
-      names.slice(i, i + batchSize).forEach((name) => {
-        batch.set(
-          doc(collection(db, "players")),
-          {
-            name,
-            createdAt: Date.now(),
-          }
-        );
+    names.slice(i, i + batchSize).forEach((name) => {
+      batch.set(doc(collection(db, "players")), {
+        name,
+        createdAt: Date.now(),
       });
+    });
 
-      // Push commit without waiting
-      promises.push(batch.commit());
-    }
+    promises.push(batch.commit());
+  }
 
-    // Run all commits together
-    await Promise.all(promises);
+  await Promise.all(promises);
 
-    setMessage(`✅ Successfully added ${names.length} players.`);
-    setNamesText("");
+  setMessage(`✅ Successfully added ${names.length} players.`);
+  setNamesText("");
 
-  } catch (err) {
+} catch (err) {
   console.error(err);
   alert(err.message);
   setMessage(err.message);
+} finally {
+  setSaving(false);
   }
-  } finally {
-    setSaving(false);
-  }
-};
 
   return (
     <div className="card" style={{ marginBottom: 20 }}>
