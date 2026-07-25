@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { collection, addDoc, updateDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore'
 import {
   signInWithEmailAndPassword,
   onAuthStateChanged,
@@ -50,9 +50,22 @@ function BulkAddPlayers() {
     if (names.length === 0) { setMessage('Paste at least one name.'); return }
     setSaving(true)
     setMessage(`Adding ${names.length} players…`)
-    await Promise.all(
-      names.map((name) => addDoc(collection(db, 'players'), { name, createdAt: Date.now() }))
-    )
+
+    // Firestore batches max out at 500 writes — chunk if needed.
+    const chunks = []
+    for (let i = 0; i < names.length; i += 450) {
+      chunks.push(names.slice(i, i + 450))
+    }
+
+    for (const chunk of chunks) {
+      const batch = writeBatch(db)
+      chunk.forEach((name) => {
+        const ref = doc(collection(db, 'players'))
+        batch.set(ref, { name, createdAt: Date.now() })
+      })
+      await batch.commit()
+    }
+
     setMessage(`Added ${names.length} players.`)
     setNamesText('')
     setSaving(false)
