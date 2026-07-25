@@ -4,7 +4,14 @@ import {
   onAuthStateChanged,
   signOut,
 } from 'firebase/auth'
-import { collection, addDoc, updateDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore'
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  writeBatch
+} from "firebase/firestore";
 import { auth, db } from '../firebase.js'
 import { useCollection } from '../hooks/useCollection.js'
 import { computeStandings } from '../utils/rankings.js'
@@ -44,31 +51,60 @@ function BulkAddPlayers() {
   const [message, setMessage] = useState('')
 
   const submit = async (e) => {
-    e.preventDefault()
-    setMessage('')
-    const names = namesText.split(/[\n,]+/).map((n) => n.trim()).filter(Boolean)
-    if (names.length === 0) { setMessage('Paste at least one name.'); return }
-    setSaving(true)
-    setMessage(`Adding ${names.length} players…`)
+  e.preventDefault();
+  setMessage("");
 
-    const chunks = []
-    for (let i = 0; i < names.length; i += 450) {
-      chunks.push(names.slice(i, i + 450))
-    }
+  // Remove empty lines and duplicate names
+  const names = [...new Set(
+    namesText
+      .split(/[\n,]+/)
+      .map(name => name.trim())
+      .filter(Boolean)
+  )];
 
-    for (const chunk of chunks) {
-      const batch = writeBatch(db)
-      chunk.forEach((name) => {
-        const ref = doc(collection(db, 'players'))
-        batch.set(ref, { name, createdAt: Date.now() })
-      })
-      await batch.commit()
-    }
-
-    setMessage(`Added ${names.length} players.`)
-    setNamesText('')
-    setSaving(false)
+  if (names.length === 0) {
+    setMessage("Paste at least one player.");
+    return;
   }
+
+  setSaving(true);
+  setMessage(`Adding ${names.length} players...`);
+
+  try {
+    const batchSize = 500;
+
+    const promises = [];
+
+    for (let i = 0; i < names.length; i += batchSize) {
+      const batch = writeBatch(db);
+
+      names.slice(i, i + batchSize).forEach((name) => {
+        batch.set(
+          doc(collection(db, "players")),
+          {
+            name,
+            createdAt: Date.now(),
+          }
+        );
+      });
+
+      // Push commit without waiting
+      promises.push(batch.commit());
+    }
+
+    // Run all commits together
+    await Promise.all(promises);
+
+    setMessage(`✅ Successfully added ${names.length} players.`);
+    setNamesText("");
+
+  } catch (err) {
+    console.error(err);
+    setMessage("❌ Failed to add players.");
+  } finally {
+    setSaving(false);
+  }
+};
 
   return (
     <div className="card" style={{ marginBottom: 20 }}>
