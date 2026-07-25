@@ -99,8 +99,10 @@ function BulkAddPlayers() {
     setNamesText("");
 
   } catch (err) {
-    console.error(err);
-    setMessage("❌ Failed to add players.");
+  console.error(err);
+  alert(err.message);
+  setMessage(err.message);
+  }
   } finally {
     setSaving(false);
   }
