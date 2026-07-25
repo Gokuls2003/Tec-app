@@ -99,6 +99,7 @@ function BulkAddPlayers() {
 } finally {
   setSaving(false);
   }
+  };
 
   return (
     <div className="card" style={{ marginBottom: 20 }}>
