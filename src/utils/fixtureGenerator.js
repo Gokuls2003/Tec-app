@@ -7,25 +7,37 @@ function shuffle(arr) {
   return a
 }
 
-export function roundLabel(playerCount) {
-  if (playerCount <= 2) return 'Final'
-  if (playerCount <= 4) return 'Semifinal'
-  if (playerCount <= 8) return 'Quarterfinal'
-  return `Round of ${playerCount}`
+function nextPowerOfTwo(n) {
+  let p = 1
+  while (p < n) p *= 2
+  return p
 }
 
-// Randomly pairs players for a knockout round. Odd count -> one bye.
+export function roundLabel(bracketSize) {
+  if (bracketSize <= 2) return 'Final'
+  if (bracketSize <= 4) return 'Semifinal'
+  if (bracketSize <= 8) return 'Quarterfinal'
+  return `Round of ${bracketSize}`
+}
+
+// Pairs up any number of players into a knockout round, padding to the next
+// bracket size (16/32/64/128/256...) with byes as needed so every round
+// stays a clean power-of-two bracket.
 export function pairKnockoutRound(players) {
   const shuffled = shuffle(players)
-  let byePlayer = null
-  if (shuffled.length % 2 === 1) {
-    byePlayer = shuffled.pop()
-  }
+  const size = shuffled.length
+  const bracketSize = nextPowerOfTwo(size)
+  const byeCount = bracketSize - size
+
+  const byePlayers = shuffled.slice(0, byeCount)
+  const toPair = shuffled.slice(byeCount)
+
   const pairs = []
-  for (let i = 0; i < shuffled.length; i += 2) {
-    pairs.push([shuffled[i], shuffled[i + 1]])
+  for (let i = 0; i < toPair.length; i += 2) {
+    pairs.push([toPair[i], toPair[i + 1]])
   }
-  return { pairs, byePlayer }
+
+  return { pairs, byePlayers, bracketSize }
 }
 
 // Every player plays every other player once.
