@@ -499,30 +499,46 @@ const deleteSelectedPlayers = async () => {
 <div className="card" style={{ marginBottom: 20 }}>
   <h3>Players</h3>
 
-  {players.map((player) => (
-    <div
-      key={player.id}
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 8,
-      }}
-    >
-      <span>{player.name}</span>
+  <div style={{ display: "flex", gap: 10, marginBottom: 15 }}>
+    <button className="btn secondary" type="button" onClick={selectAllPlayers}>
+      Select All
+    </button>
 
-      <button
-        className="btn secondary"
-        onClick={async () => {
-          if (window.confirm(`Delete ${player.name}?`)) {
-            await deleteDoc(doc(db, "players", player.id));
-          }
+    <button className="btn secondary" type="button" onClick={clearSelection}>
+      Clear
+    </button>
+
+    <button
+      className="btn"
+      type="button"
+      disabled={selectedPlayers.length === 0}
+      onClick={deleteSelectedPlayers}
+    >
+      Delete Selected ({selectedPlayers.length})
+    </button>
+  </div>
+
+  <div style={{ maxHeight: 350, overflowY: "auto" }}>
+    {players.map((player) => (
+      <label
+        key={player.id}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 8,
         }}
       >
-        Delete
-      </button>
-    </div>
-  ))}
+        <input
+          type="checkbox"
+          checked={selectedPlayers.includes(player.id)}
+          onChange={() => togglePlayer(player.id)}
+        />
+
+        {player.name}
+      </label>
+    ))}
+  </div>
 </div>
 
 <AutoFixtureGenerator players={players} />
