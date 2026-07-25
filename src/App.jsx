@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar.jsx'
 import Footer from './components/Footer.jsx'
 import Home from './pages/Home.jsx'
+import History from './pages/History.jsx'
 import Admin from './pages/Admin.jsx'
 
 export default function App() {
@@ -11,6 +12,7 @@ export default function App() {
       <main className="container">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/history" element={<History />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>
       </main>
