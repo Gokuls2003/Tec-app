@@ -9,6 +9,7 @@ export default function Navbar() {
         </NavLink>
         <ul className="nav-links" style={{ position: 'static', display: 'flex' }}>
           <li><NavLink to="/" end>Fixtures</NavLink></li>
+          <li><NavLink to="/history">History</NavLink></li>
           <li><NavLink to="/admin">Admin</NavLink></li>
         </ul>
       </div>
